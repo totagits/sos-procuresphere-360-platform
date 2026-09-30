@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/sos-procuresphere-360-platform/sw.js', { scope: '/sos-procuresphere-360-platform/' })})}
