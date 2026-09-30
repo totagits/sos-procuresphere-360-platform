@@ -1,0 +1,21 @@
+{
+  "name": "sos-procuresphere-360",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace @sos-procuresphere/api\" \"npm run dev --workspace @sos-procuresphere/web\"",
+    "dev:api": "npm run dev --workspace @sos-procuresphere/api",
+    "dev:web": "npm run dev --workspace @sos-procuresphere/web",
+    "build": "npm run build --workspace @sos-procuresphere/shared && npm run build --workspace @sos-procuresphere/api && npm run build --workspace @sos-procuresphere/web",
+    "check": "npm run check --workspace @sos-procuresphere/shared && npm run check --workspace @sos-procuresphere/api && npm run check --workspace @sos-procuresphere/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.3"
+  }
+}

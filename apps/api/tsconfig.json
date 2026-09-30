@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "src/main.ts",
+    "src/lib/**/*",
+    "src/modules/**/*",
+    "src/routes/index.ts",
+    "src/types/**/*"
+  ]
+}

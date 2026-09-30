@@ -1,0 +1,33 @@
+{
+  "name": "@sos-procuresphere/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node ../../node_modules/tsx/dist/cli.mjs watch src/main.ts",
+    "build": "node ../../node_modules/tsup/dist/cli-default.js src/main.ts --format esm --target node20 --clean",
+    "check": "node ../../node_modules/typescript/bin/tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@sos-procuresphere/shared": "0.1.0",
+    "@prisma/client": "^6.8.2",
+    "adm-zip": "^0.5.16",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "helmet": "^8.1.0",
+    "multer": "^2.0.0",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.1",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.0.1",
+    "@types/swagger-ui-express": "^4.1.8",
+    "prisma": "^6.8.2",
+    "tsup": "^8.5.0",
+    "tsx": "^4.8.1",
+    "typescript": "^5.8.3"
+  }
+}

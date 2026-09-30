@@ -1,0 +1,642 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+  escalated
+}
+
+enum ProcurementStatus {
+  draft
+  submitted
+  pending_approval
+  approved
+  issued
+  partially_received
+  closed
+  exception
+}
+
+enum RfxType {
+  RFI
+  RFQ
+  RFP
+}
+
+enum RfxStatus {
+  draft
+  published
+  closed
+  evaluated
+  awarded
+}
+
+enum MatchStatus {
+  matched
+  exception
+}
+
+enum DocumentPermissionLevel {
+  view
+  edit
+  download
+}
+
+model User {
+  id             String            @id @default(cuid())
+  email          String            @unique
+  name           String
+  title          String
+  totpEnabled    Boolean           @default(false)
+  lastLoginAt    DateTime?
+  locationId     String
+  departmentId   String
+  location       Location          @relation(fields: [locationId], references: [id])
+  department     Department        @relation(fields: [departmentId], references: [id])
+  roles          UserRole[]
+  supplierDocs   SupplierDocument[]
+  uploadedDocs   Document[]
+  documentVers   DocumentVersion[]
+  auditEvents    AuditEvent[]
+  prs            PR[]              @relation("RequesterPR")
+  prApprovals    PRApproval[]
+  poApprovals    POApproval[]
+  poAmendments   POAmendment[]
+  grns           GRN[]
+  serviceEntries ServiceEntry[]
+  evaluations    Evaluation[]
+  payments       PaymentApproval[]
+  archiveLogs    ArchiveLog[]
+}
+
+model Role {
+  id              String               @id @default(cuid())
+  name            String               @unique
+  description     String
+  users           UserRole[]
+  permissions     RolePermission[]
+  docPermissions  DocumentPermission[]
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  code        String           @unique
+  label       String
+  module      String
+  roles       RolePermission[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model Location {
+  id      String @id @default(cuid())
+  name    String
+  code    String @unique
+  region  String
+  users   User[]
+  prs     PR[]
+}
+
+model Department {
+  id         String @id @default(cuid())
+  name       String
+  costCenter String
+  users      User[]
+  prs        PR[]
+}
+
+model Supplier {
+  id                   String               @id @default(cuid())
+  name                 String
+  contactName          String
+  email                String               @unique
+  phone                String
+  bankingDetails       String
+  taxId                String
+  preferred            Boolean              @default(false)
+  status               String
+  categories           String[]
+  dueDiligenceChecklist String[]
+  documents            SupplierDocument[]
+  performances         SupplierPerformance[]
+  blacklist            Blacklist?
+  bids                 SupplierBid[]
+  pos                  PO[]
+  invoices             Invoice[]
+  docs                 Document[]
+}
+
+model SupplierDocument {
+  id         String   @id @default(cuid())
+  supplierId String
+  uploadedBy String?
+  type       String
+  fileName   String
+  expiryDate DateTime?
+  status     String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  uploader   User?    @relation(fields: [uploadedBy], references: [id])
+}
+
+model SupplierPerformance {
+  id              String   @id @default(cuid())
+  supplierId      String
+  deliveryScore   Int
+  qualityScore    Int
+  complianceScore Int
+  comment         String
+  evaluatedAt     DateTime
+  supplier        Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+}
+
+model Blacklist {
+  id         String   @id @default(cuid())
+  supplierId String   @unique
+  reason     String
+  fromDate   DateTime
+  toDate     DateTime?
+  approvedBy String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+}
+
+model BudgetLedger {
+  id          String   @id @default(cuid())
+  projectCode String
+  budgetLine  String
+  donorCode   String
+  planned     Decimal  @db.Decimal(18, 2)
+  committed   Decimal  @db.Decimal(18, 2)
+  actual      Decimal  @db.Decimal(18, 2)
+  mode        String
+  prChecks    BudgetCheckResult[]
+}
+
+model BudgetCheckResult {
+  id         String    @id @default(cuid())
+  prId       String?
+  budgetId   String?
+  budgetLine String
+  projectCode String
+  planned    Decimal   @db.Decimal(18, 2)
+  committed  Decimal   @db.Decimal(18, 2)
+  actual     Decimal   @db.Decimal(18, 2)
+  available  Decimal   @db.Decimal(18, 2)
+  mode       String
+  status     String
+  message    String
+  checkedAt  DateTime
+  pr         PR?       @relation(fields: [prId], references: [id])
+  budget     BudgetLedger? @relation(fields: [budgetId], references: [id])
+}
+
+model PR {
+  id           String             @id @default(cuid())
+  title        String
+  justification String
+  requesterId  String
+  requesterName String
+  departmentId String
+  locationId   String
+  donorCode    String
+  projectCode  String
+  budgetLine   String
+  amount       Decimal            @db.Decimal(18, 2)
+  currency     String
+  policyRule   String
+  status       ProcurementStatus
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  requester    User               @relation("RequesterPR", fields: [requesterId], references: [id])
+  department   Department         @relation(fields: [departmentId], references: [id])
+  location     Location           @relation(fields: [locationId], references: [id])
+  lineItems    PRLineItem[]
+  approvals    PRApproval[]
+  budgetCheck  BudgetCheckResult[]
+  documents    DocumentReference[]
+  po           PO[]
+}
+
+model PRLineItem {
+  id          String   @id @default(cuid())
+  prId        String
+  description String
+  quantity    Decimal  @db.Decimal(18, 2)
+  unit        String
+  unitPrice   Decimal  @db.Decimal(18, 2)
+  leadTimeDays Int?
+  warrantyMonths Int?
+  category    String
+  pr          PR       @relation(fields: [prId], references: [id], onDelete: Cascade)
+}
+
+model PRApproval {
+  id            String         @id @default(cuid())
+  prId          String
+  approverId    String
+  approverName  String
+  roleLabel     String
+  thresholdRule String
+  status        ApprovalStatus
+  actedAt       DateTime?
+  note          String?
+  pr            PR             @relation(fields: [prId], references: [id], onDelete: Cascade)
+  approver      User           @relation(fields: [approverId], references: [id])
+}
+
+model RFx {
+  id                String             @id @default(cuid())
+  type              RfxType
+  title             String
+  description       String
+  closingAt         DateTime
+  category          String
+  status            RfxStatus
+  reverseAuction    Boolean            @default(false)
+  items             RFxItem[]
+  invitedSuppliers  String[]
+  bids              SupplierBid[]
+  evaluations       Evaluation[]
+  award             Award?
+  documents         DocumentReference[]
+}
+
+model RFxItem {
+  id            String   @id @default(cuid())
+  rfxId         String
+  description   String
+  specification String
+  quantity      Decimal  @db.Decimal(18, 2)
+  unit          String
+  unitPrice     Decimal  @db.Decimal(18, 2)
+  category      String
+  rfx           RFx      @relation(fields: [rfxId], references: [id], onDelete: Cascade)
+}
+
+model SupplierBid {
+  id                 String       @id @default(cuid())
+  rfxId              String
+  supplierId         String
+  supplierName       String
+  submittedAt        DateTime
+  totalAmount        Decimal      @db.Decimal(18, 2)
+  currency           String
+  leadTimeDays       Int
+  warrantyMonths     Int
+  complianceStatement String
+  rfx                RFx          @relation(fields: [rfxId], references: [id], onDelete: Cascade)
+  supplier           Supplier     @relation(fields: [supplierId], references: [id])
+  bidDocs            BidDoc[]
+  evaluation         Evaluation?
+}
+
+model BidDoc {
+  id       String      @id @default(cuid())
+  bidId    String
+  title    String
+  fileName String
+  bid      SupplierBid @relation(fields: [bidId], references: [id], onDelete: Cascade)
+}
+
+model Evaluation {
+  id            String       @id @default(cuid())
+  rfxId         String
+  bidId         String       @unique
+  evaluatorId   String?
+  totalScore    Decimal      @db.Decimal(10, 2)
+  committeeNotes String
+  recommended   Boolean      @default(false)
+  rfx           RFx          @relation(fields: [rfxId], references: [id], onDelete: Cascade)
+  bid           SupplierBid  @relation(fields: [bidId], references: [id], onDelete: Cascade)
+  evaluator     User?        @relation(fields: [evaluatorId], references: [id])
+}
+
+model Award {
+  id             String   @id @default(cuid())
+  rfxId          String   @unique
+  bidId          String   @unique
+  supplierId     String
+  supplierName   String
+  recommendation String
+  approvedBy     String
+  approvedAt     DateTime
+  rfx            RFx      @relation(fields: [rfxId], references: [id], onDelete: Cascade)
+  bid            SupplierBid @relation(fields: [bidId], references: [id], onDelete: Cascade)
+}
+
+model PO {
+  id                  String         @id @default(cuid())
+  sourceRequisitionId String?
+  sourceAwardId       String?
+  supplierId          String
+  supplierName        String
+  amount              Decimal        @db.Decimal(18, 2)
+  currency            String
+  projectCode         String
+  budgetLine          String
+  status              ProcurementStatus
+  issuedAt            DateTime?
+  createdAt           DateTime       @default(now())
+  supplier            Supplier       @relation(fields: [supplierId], references: [id])
+  requisition         PR?            @relation(fields: [sourceRequisitionId], references: [id])
+  lines               POLine[]
+  approvals           POApproval[]
+  amendments          POAmendment[]
+  grns                GRN[]
+  serviceEntries      ServiceEntry[]
+  invoices            Invoice[]
+  documents           DocumentReference[]
+}
+
+model POLine {
+  id          String   @id @default(cuid())
+  poId        String
+  description String
+  quantity    Decimal  @db.Decimal(18, 2)
+  unit        String
+  unitPrice   Decimal  @db.Decimal(18, 2)
+  category    String
+  po          PO       @relation(fields: [poId], references: [id], onDelete: Cascade)
+}
+
+model POApproval {
+  id            String         @id @default(cuid())
+  poId          String
+  approverId    String
+  approverName  String
+  roleLabel     String
+  thresholdRule String
+  status        ApprovalStatus
+  actedAt       DateTime?
+  note          String?
+  po            PO             @relation(fields: [poId], references: [id], onDelete: Cascade)
+  approver      User           @relation(fields: [approverId], references: [id])
+}
+
+model POAmendment {
+  id         String   @id @default(cuid())
+  poId       String
+  version    Int
+  summary    String
+  approvedBy String
+  approvedAt DateTime
+  po         PO       @relation(fields: [poId], references: [id], onDelete: Cascade)
+  approver   User     @relation(fields: [approvedBy], references: [id])
+}
+
+model GRN {
+  id           String         @id @default(cuid())
+  poId         String
+  receiverId   String
+  receiverName String
+  receivedAt   DateTime
+  status       String
+  note         String?
+  po           PO             @relation(fields: [poId], references: [id], onDelete: Cascade)
+  receiver     User           @relation(fields: [receiverId], references: [id])
+  lines        ReceivingLine[]
+}
+
+model ServiceEntry {
+  id           String         @id @default(cuid())
+  poId         String
+  confirmerId  String
+  confirmerName String
+  confirmedAt  DateTime
+  status       String
+  note         String?
+  po           PO             @relation(fields: [poId], references: [id], onDelete: Cascade)
+  confirmer    User           @relation(fields: [confirmerId], references: [id])
+}
+
+model ReceivingLine {
+  id               String   @id @default(cuid())
+  grnId            String
+  lineItemId       String
+  receivedQuantity Decimal  @db.Decimal(18, 2)
+  acceptedQuantity Decimal  @db.Decimal(18, 2)
+  grn              GRN      @relation(fields: [grnId], references: [id], onDelete: Cascade)
+}
+
+model Invoice {
+  id            String         @id @default(cuid())
+  poId          String
+  supplierId    String
+  supplierName  String
+  invoiceNumber String
+  amount        Decimal        @db.Decimal(18, 2)
+  currency      String
+  submittedAt   DateTime
+  submittedBy   String
+  status        String
+  po            PO             @relation(fields: [poId], references: [id], onDelete: Cascade)
+  supplier      Supplier       @relation(fields: [supplierId], references: [id])
+  lines         InvoiceLine[]
+  matchResult   MatchResult?
+  paymentRequest PaymentRequest?
+  documents     DocumentReference[]
+}
+
+model InvoiceLine {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Decimal  @db.Decimal(18, 2)
+  unit        String
+  unitPrice   Decimal  @db.Decimal(18, 2)
+  category    String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model MatchResult {
+  id         String         @id @default(cuid())
+  invoiceId  String         @unique
+  matchType  String
+  status     MatchStatus
+  checkedAt  DateTime
+  invoice    Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  exceptions MatchException[]
+}
+
+model MatchException {
+  id            String      @id @default(cuid())
+  matchResultId String
+  type          String
+  severity      String
+  resolved      Boolean     @default(false)
+  resolutionNote String?
+  resolvedBy    String?
+  matchResult   MatchResult  @relation(fields: [matchResultId], references: [id], onDelete: Cascade)
+}
+
+model PaymentRequest {
+  id              String               @id @default(cuid())
+  invoiceId       String               @unique
+  amount          Decimal              @db.Decimal(18, 2)
+  currency        String
+  status          String
+  invoice         Invoice              @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  approvals       PaymentApproval[]
+  bankTransferRef BankTransferRef?
+  reconciliation  ReconciliationRecord?
+  documents       DocumentReference[]
+}
+
+model PaymentApproval {
+  id          String         @id @default(cuid())
+  paymentId   String
+  approverId  String
+  approverName String
+  status      ApprovalStatus
+  actedAt     DateTime?
+  note        String?
+  payment     PaymentRequest @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  approver    User           @relation(fields: [approverId], references: [id])
+}
+
+model BankTransferRef {
+  id            String         @id @default(cuid())
+  paymentId     String         @unique
+  adapter       String
+  bankReference String         @unique
+  status        String
+  updatedAt     DateTime
+  payment       PaymentRequest @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+}
+
+model ReconciliationRecord {
+  id               String         @id @default(cuid())
+  paymentId        String         @unique
+  matched          Boolean        @default(false)
+  bankStatementRef String
+  reconciledAt     DateTime?
+  payment          PaymentRequest @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+}
+
+model RetentionPolicy {
+  id               String     @id @default(cuid())
+  category         String
+  retainYears      Int
+  archiveAfterDays Int
+  legalHoldAllowed Boolean    @default(true)
+  documents        Document[]
+}
+
+model Document {
+  id                String                @id @default(cuid())
+  title             String
+  docType           String
+  supplierId        String?
+  uploadedBy        String
+  uploadedAt        DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  ocrText           String
+  currentVersionId  String?
+  retentionPolicyId String
+  archived          Boolean               @default(false)
+  archiveDueAt      DateTime
+  filePath          String?
+  supplier          Supplier?             @relation(fields: [supplierId], references: [id])
+  uploader          User                  @relation(fields: [uploadedBy], references: [id])
+  retentionPolicy   RetentionPolicy       @relation(fields: [retentionPolicyId], references: [id])
+  versions          DocumentVersion[]
+  metadata          Metadata[]
+  references        DocumentReference[]
+  permissions       DocumentPermission[]
+  archiveLog        ArchiveLog[]
+}
+
+model DocumentVersion {
+  id          String   @id @default(cuid())
+  documentId  String
+  label       String
+  fileName    String
+  uploadedBy  String
+  uploadedAt  DateTime
+  hash        String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  uploader    User     @relation(fields: [uploadedBy], references: [id])
+}
+
+model Metadata {
+  id         String   @id @default(cuid())
+  documentId String
+  key        String
+  value      String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model DocumentReference {
+  id        String   @id @default(cuid())
+  documentId String
+  entityType String
+  prId       String?
+  rfxId      String?
+  poId       String?
+  invoiceId  String?
+  paymentId  String?
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  pr        PR?      @relation(fields: [prId], references: [id])
+  rfx       RFx?     @relation(fields: [rfxId], references: [id])
+  po        PO?      @relation(fields: [poId], references: [id])
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+  payment   PaymentRequest? @relation(fields: [paymentId], references: [id])
+}
+
+model DocumentPermission {
+  id         String                  @id @default(cuid())
+  documentId String
+  roleId     String
+  level      DocumentPermissionLevel
+  document   Document                @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  role       Role                    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+}
+
+model ArchiveLog {
+  id         String   @id @default(cuid())
+  documentId String
+  actedBy    String
+  actedAt    DateTime
+  action     String
+  reason     String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  actor      User     @relation(fields: [actedBy], references: [id])
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  actorId    String
+  actorName  String
+  action     String
+  entityType String
+  entityId   String
+  occurredAt DateTime @default(now())
+  detail     String
+  actor      User     @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([occurredAt])
+}

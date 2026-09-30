@@ -1,0 +1,104 @@
+import { useQuery } from "@tanstack/react-query";
+import { MetricBars, Panel, SectionHeading, StatCard, StatusBadge, Table } from "@/components/dashboard/widgets";
+import { api } from "@/lib/api";
+
+export const OverviewPage = () => {
+  const { data } = useQuery({ queryKey: ["dashboard"], queryFn: api.dashboard });
+
+  if (!data) {
+    return null;
+  }
+
+  const countCards = [
+    { label: "Suppliers", value: data.counts.suppliers, hint: "Onboarded and due-diligence tracked" },
+    { label: "Procurement Cases", value: data.counts.requisitions + data.counts.rfxs + data.counts.purchaseOrders, hint: "Live PR, RFx, and PO records" },
+    { label: "Documents", value: data.counts.documents, hint: "OCR-indexed records in the DMS" },
+    { label: "Audit Events", value: data.counts.auditEvents, hint: "Immutable actions captured for review" }
+  ];
+
+  return (
+    <div className="space-y-6">
+      <section className="grid gap-4 xl:grid-cols-4">
+        {countCards.map((card) => (
+          <StatCard key={card.label} {...card} />
+        ))}
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <Panel>
+          <SectionHeading
+            eyebrow="Performance"
+            title="Real-time spend and cycle-time dashboards"
+            detail="Operational KPIs keep procurement, finance, and leadership teams aligned on throughput, compliance, and budget drawdown."
+          />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div>
+              <h3 className="mb-4 font-['Sora'] text-lg font-semibold">Spend by supplier</h3>
+              <MetricBars items={data.metrics.spendBySupplier} money />
+            </div>
+            <div>
+              <h3 className="mb-4 font-['Sora'] text-lg font-semibold">Budget utilization</h3>
+              <MetricBars items={data.metrics.budgetUtilization} />
+            </div>
+          </div>
+        </Panel>
+
+        <Panel>
+          <SectionHeading
+            eyebrow="Compliance"
+            title="Workflow readiness map"
+            detail="The seeded environment demonstrates every acceptance workflow from requisition to payment and audit pack export."
+          />
+          <div className="space-y-4">
+            {data.workflowCoverage.map((item) => (
+              <div key={item.label} className="rounded-[24px] border border-slate-100 bg-slate-50/90 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-brand-ink">{item.label}</p>
+                    <p className="text-sm text-slate-500">{item.reference}</p>
+                  </div>
+                  <StatusBadge value={item.status} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <Panel>
+          <SectionHeading
+            eyebrow="Approvals"
+            title="Pending actions and SLA awareness"
+            detail="Approvals and escalations remain visible across procurement and finance without burying approvers in email chains."
+          />
+          <Table
+            headers={["Type", "Reference", "Title", "Approver", "Rule"]}
+            rows={data.pendingApprovals.map((item) => [item.type, item.reference, item.title, item.approverName, item.thresholdRule])}
+          />
+        </Panel>
+
+        <Panel>
+          <SectionHeading
+            eyebrow="Notifications"
+            title="Exceptions, reminders, and control prompts"
+            detail="Notifications support escalations, expiring compliance artifacts, and threshold-driven prompts."
+          />
+          <div className="space-y-4">
+            {data.notifications.map((notification) => (
+              <div key={notification.id} className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-brand-ink">{notification.title}</p>
+                    <p className="mt-1 text-sm text-slate-600">{notification.body}</p>
+                  </div>
+                  <StatusBadge value={notification.severity} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </section>
+    </div>
+  );
+};
