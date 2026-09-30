@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>SOS ProcureSphere 360</title>
+    <script>
+      // GitHub Pages SPA redirect: preserve the path as a query param so index.html can restore it
+      const l = window.location;
+      l.replace(
+        l.protocol + '//' + l.host + l.pathname.split('/').slice(0, 2).join('/') +
+        '/?p=' + encodeURIComponent(l.pathname.slice(1) + l.search) + (l.hash || '')
+      );
+    </script>
+  </head>
+  <body>Redirecting…</body>
+</html>

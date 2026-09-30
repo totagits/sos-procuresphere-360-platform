@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  base: process.env.GITHUB_PAGES === "true" ? "/sos-procuresphere-360-platform/" : "/",
   plugins: [
     react(),
     VitePWA({

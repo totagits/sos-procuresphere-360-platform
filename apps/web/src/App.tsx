@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import type { Department, Location, Role, User } from "@sos-procuresphere/shared";
 import { AppShell } from "@/components/layout/AppShell";
 import { api, clearUserId, currentUserId, persistUserId, type SessionPayload, type SignupPayload } from "@/lib/api";
@@ -123,7 +123,7 @@ export const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <HashRouter>
         <Routes>
           <Route
             path="/"
@@ -184,7 +184,7 @@ export const App = () => {
             <Route index element={<Navigate to={session ? "/app/overview" : "/auth"} replace />} />
           </Route>
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </QueryClientProvider>
   );
 };
